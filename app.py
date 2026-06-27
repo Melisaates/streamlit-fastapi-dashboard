@@ -1,128 +1,96 @@
 import streamlit as st
+import requests
 import matplotlib.pyplot as plt
-import pandas as pd
 
-# -------------------------------------------------
-# PAGE CONFIG
-# -------------------------------------------------
-st.set_page_config(
-    page_title="Mini Dashboard",
-    page_icon="📊",
-    layout="centered"
-)
+BASE_URL = "http://127.0.0.1:8000"
 
-st.title("📋 Mini Dashboard")
-st.write("Simple Streamlit application with a text list and scatter plot.")
+st.set_page_config(page_title="Full Stack Dashboard", layout="centered")
 
-# -------------------------------------------------
-# SESSION STATE
-# -------------------------------------------------
-if "items" not in st.session_state:
-    st.session_state["items"] = []
+st.title("📋 Full Stack Dashboard (Streamlit + FastAPI)")
 
-if "points" not in st.session_state:
-    st.session_state["points"] = [
-        {"x": 1, "y": 2},
-        {"x": 3, "y": 5},
-        {"x": 5, "y": 1},
-    ]
+# =========================
+# FEATURE 1 - ITEMS
+# =========================
 
-# =================================================
-# FEATURE 1 - TEXT ENTRY LIST
-# =================================================
+st.header("📝 Items (API Powered)")
 
-st.header("📝 Text Entry List")
+# GET items
+try:
+    items = requests.get(f"{BASE_URL}/items").json()
+except:
+    items = []
 
-text = st.text_input("Enter a new item")
+text = st.text_input("Enter item")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("➕ Add Item", use_container_width=True):
+    if st.button("➕ Add Item"):
         if text.strip():
-            st.session_state["items"].append(text.strip())
+            requests.post(
+                f"{BASE_URL}/items",
+                json={"text": text}
+            )
+            st.rerun()
 
 with col2:
-    if st.button("🗑 Clear All", use_container_width=True):
-        st.session_state["items"].clear()
+    if st.button("🔄 Refresh"):
+        st.rerun()
 
-st.write(f"**Total Items:** {len(st.session_state['items'])}")
+st.write(f"Total Items: {len(items)}")
 
-if len(st.session_state["items"]) == 0:
-    st.info("No items added yet.")
+if items:
+    for item in items:
+        st.write(f"• {item}")
 else:
-
-    for index, item in enumerate(st.session_state["items"]):
-
-        left, right = st.columns([8, 1])
-
-        with left:
-            st.write(f"• {item}")
-
-        with right:
-            if st.button("❌", key=f"delete_{index}"):
-                st.session_state["items"].pop(index)
-                st.rerun()
-
-    items_df = pd.DataFrame({
-        "Item": st.session_state["items"]
-    })
-
-    st.download_button(
-        label="⬇ Download Items CSV",
-        data=items_df.to_csv(index=False),
-        file_name="items.csv",
-        mime="text/csv"
-    )
+    st.info("No items yet.")
 
 st.divider()
 
-# =================================================
+# =========================
 # FEATURE 2 - SCATTER PLOT
-# =================================================
+# =========================
 
-st.header("📈 Scatter Plot")
+st.header("📈 Scatter Plot (API Data)")
 
-st.write("Add your own data points.")
+x = st.number_input("X Value", value=0.0)
+y = st.number_input("Y Value", value=0.0)
 
-colx, coly = st.columns(2)
-
-with colx:
-    x_value = st.number_input("X Value", value=0.0)
-
-with coly:
-    y_value = st.number_input("Y Value", value=0.0)
-
-if st.button("Add Point"):
-    st.session_state["points"].append(
-        {
-            "x": x_value,
-            "y": y_value
-        }
+if st.button("➕ Add Point"):
+    requests.post(
+        f"{BASE_URL}/points",
+        json={"x": x, "y": y}
     )
+    st.rerun()
 
-points_df = pd.DataFrame(st.session_state["points"])
+# GET points
+try:
+    points = requests.get(f"{BASE_URL}/points").json()
+except:
+    points = []
 
-fig, ax = plt.subplots(figsize=(6, 4))
+if points:
+    xs = [p["x"] for p in points]
+    ys = [p["y"] for p in points]
 
-ax.scatter(
-    points_df["x"],
-    points_df["y"],
-    s=80
-)
+    fig, ax = plt.subplots(figsize=(6, 4))
 
-ax.set_title("Scatter Plot")
-ax.set_xlabel("X")
-ax.set_ylabel("Y")
-ax.grid(True)
+    # Scatter
+    ax.scatter(xs, ys, s=80, alpha=0.8, label="Points")
 
-st.pyplot(fig)
+    # Line connection
+    if len(xs) > 1:
+        ax.scatter(xs, ys, s=80, alpha=0.8)
 
-st.write(f"**Total Points:** {len(points_df)}")
+    # Styling
+    ax.set_title("Scatter Plot (FastAPI Data)")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.grid(True, linestyle="--", alpha=0.4)
+    ax.legend()
 
-st.download_button(
-    label="⬇ Download Scatter Data",
-    data=points_df.to_csv(index=False),
-    file_name="scatter_data.csv",
-    mime="text/csv"
-)
+    st.pyplot(fig)
+
+    st.write(f"Total Points: {len(points)}")
+else:
+    st.info("No points yet.")
